@@ -4,22 +4,23 @@ Daily Yandex Direct campaign reports delivered straight to Telegram.
 
 **Free. Secure. Zero dependencies.**
 
-```
-┌──────────────────────────────────────────────┐
-│  Yandex Direct — Yesterday                   │
-│                                              │
-│  Impressions    12 450                       │
-│  Clicks            312                       │
-│  Spend          4 870.50 ₽                   │
-│  CTR              2.51%                      │
-│  Avg. CPC        15.61 ₽                    │
-│                                              │
-│  ▸ Brand Campaign                            │
-│    8 200 impressions · 245 clicks · 3 100 ₽  │
-│  ▸ Retargeting                               │
-│    4 250 impressions · 67 clicks · 1 770 ₽   │
-└──────────────────────────────────────────────┘
-```
+> **Sample Telegram message:**
+>
+> :bar_chart: **Yandex Direct — Yesterday**
+>
+> Impressions: **12 450**
+> Clicks: **312**
+> Spend: **4 870.50 RUB**
+> CTR: **2.51%**
+> Avg. CPC: **15.61 RUB**
+>
+> :clipboard: **By campaign:**
+>
+> **Brand Campaign**
+> 8 200 impressions · 245 clicks · 3 100 RUB
+>
+> **Retargeting**
+> 4 250 impressions · 67 clicks · 1 770 RUB
 
 ## How It Works
 
