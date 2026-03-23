@@ -102,10 +102,10 @@ def fmt_ctr(val):
         return val
 
 
-def build_daily_message(rows):
+def build_daily_message(rows, period="Вчера"):
     """Build Telegram message for daily campaign report."""
     if not rows:
-        return "📊 <b>Яндекс Директ — Вчера</b>\n\nНет данных за вчера."
+        return f"📊 <b>Яндекс Директ — {period}</b>\n\nНет данных за этот период."
 
     total_impressions = sum(int(r.get("Impressions", 0)) for r in rows)
     total_clicks = sum(int(r.get("Clicks", 0)) for r in rows)
@@ -114,7 +114,7 @@ def build_daily_message(rows):
     avg_cpc = (total_cost / total_clicks) if total_clicks > 0 else 0
 
     lines = [
-        "📊 <b>Яндекс Директ — Вчера</b>",
+        f"📊 <b>Яндекс Директ — {period}</b>",
         "",
         f"Показы: <b>{fmt_number(total_impressions)}</b>",
         f"Клики: <b>{fmt_number(total_clicks)}</b>",
@@ -219,7 +219,7 @@ def main():
         date_range = "TODAY"
         tsv = yandex_report(date_range, fields)
         rows = parse_tsv(tsv, fields)
-        msg = build_daily_message(rows).replace("Вчера", "Сегодня")
+        msg = build_daily_message(rows, period="Сегодня")
     else:
         date_range = "YESTERDAY"
         tsv = yandex_report(date_range, fields)
