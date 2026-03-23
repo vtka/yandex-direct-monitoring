@@ -17,6 +17,7 @@ name: Yandex Direct Report
         type: choice
         options:
           - daily
+          - today
           - weekly
         default: daily
 

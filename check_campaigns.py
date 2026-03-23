@@ -215,6 +215,11 @@ def main():
         tsv = yandex_report(date_range, fields)
         rows = parse_tsv(tsv, fields)
         msg = build_weekly_message(rows)
+    elif report_type == "today":
+        date_range = "TODAY"
+        tsv = yandex_report(date_range, fields)
+        rows = parse_tsv(tsv, fields)
+        msg = build_daily_message(rows).replace("Вчера", "Сегодня")
     else:
         date_range = "YESTERDAY"
         tsv = yandex_report(date_range, fields)
