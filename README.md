@@ -1,46 +1,90 @@
 # Yandex Direct Monitor
 
-Ежедневная сводка по рекламным кампаниям Яндекс Директ в Telegram.
+Daily Yandex Direct campaign reports delivered straight to Telegram.
 
-## Что делает
+**Free. Secure. Zero dependencies.**
 
-- **Каждый день в 9:00 МСК** — сводка за вчера (показы, клики, расход, CTR по каждой кампании)
-- **По понедельникам в 9:05 МСК** — недельная сводка
-- Бесплатно (GitHub Actions + Telegram Bot API)
-- Без зависимостей (только стандартная библиотека Python)
-
-## Настройка
-
-### 1. Telegram-бот
-
-1. Написать [@BotFather](https://t.me/BotFather) → `/newbot` → получить токен
-2. Добавить бота в группу
-3. Узнать `chat_id` группы:
-   ```
-   https://api.telegram.org/bot<TOKEN>/getUpdates
-   ```
-   Отправить любое сообщение в группу, затем в ответе найти `"chat":{"id":-123456789}`
-
-### 2. GitHub-репозиторий
-
-1. Создать репозиторий и запушить код
-2. Settings → Secrets and variables → Actions → New repository secret:
-   - `YANDEX_DIRECT_TOKEN` — OAuth-токен Яндекс Директ
-   - `TELEGRAM_BOT_TOKEN` — токен бота из BotFather
-   - `TELEGRAM_CHAT_ID` — ID чата/группы (с минусом для групп)
-
-### 3. Проверка
-
-Actions → Yandex Direct Report → Run workflow → поставить галку "Send a test notification"
-
-## Ручной запуск
-
-Через GitHub Actions: Run workflow → выбрать `daily` или `weekly`.
-
-Локально:
-```bash
-export YANDEX_DIRECT_TOKEN=...
-export TELEGRAM_BOT_TOKEN=...
-export TELEGRAM_CHAT_ID=...
-python3 check_campaigns.py
 ```
+┌──────────────────────────────────────────────┐
+│  Yandex Direct — Yesterday                   │
+│                                              │
+│  Impressions    12 450                       │
+│  Clicks            312                       │
+│  Spend          4 870.50 ₽                   │
+│  CTR              2.51%                      │
+│  Avg. CPC        15.61 ₽                    │
+│                                              │
+│  ▸ Brand Campaign                            │
+│    8 200 impressions · 245 clicks · 3 100 ₽  │
+│  ▸ Retargeting                               │
+│    4 250 impressions · 67 clicks · 1 770 ₽   │
+└──────────────────────────────────────────────┘
+```
+
+## How It Works
+
+| | |
+|---|---|
+| **Schedule** | Daily at 9:00 AM MSK, weekly summary on Mondays |
+| **Data** | Impressions, clicks, spend, CTR, CPC per campaign |
+| **Delivery** | Telegram group or private chat |
+| **Cost** | $0 — GitHub Actions free tier + Telegram Bot API |
+| **Dependencies** | None — Python standard library only |
+| **Security** | Secrets stored in GitHub, never in code |
+
+## Quick Start
+
+### 1. Create a Telegram Bot
+
+1. Message [@BotFather](https://t.me/BotFather) → `/newbot` → copy the token
+2. Add the bot to your group
+3. Get the group `chat_id`:
+   ```
+   curl https://api.telegram.org/bot<TOKEN>/getUpdates
+   ```
+   Send any message to the group, then find `"chat":{"id":-123456789}` in the response
+
+### 2. Deploy
+
+Fork or clone this repo, then add three **repository secrets**:
+
+> **Settings → Secrets and variables → Actions → New repository secret**
+
+| Secret | Value |
+|---|---|
+| `YANDEX_DIRECT_TOKEN` | Your Yandex Direct OAuth token |
+| `TELEGRAM_BOT_TOKEN` | Bot token from BotFather |
+| `TELEGRAM_CHAT_ID` | Chat/group ID (negative for groups) |
+
+### 3. Verify
+
+**Actions → Yandex Direct Report → Run workflow** → check "Send a test notification"
+
+## Usage
+
+Reports are sent automatically on schedule. You can also trigger them manually:
+
+| Method | How |
+|---|---|
+| **GitHub Actions** | Run workflow → choose `daily` or `weekly` |
+| **Local** | `YANDEX_DIRECT_TOKEN=... TELEGRAM_BOT_TOKEN=... TELEGRAM_CHAT_ID=... python3 check_campaigns.py` |
+| **Custom period** | Set `REPORT_TYPE=weekly` env var for 7-day summary |
+
+## Architecture
+
+```
+GitHub Actions (cron)
+       │
+       ▼
+ Yandex Direct API ──── Reports endpoint (TSV)
+       │
+       ▼
+ check_campaigns.py ─── Parse & format
+       │
+       ▼
+ Telegram Bot API ───── Send to group
+```
+
+## License
+
+MIT
