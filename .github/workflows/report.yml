@@ -1,0 +1,56 @@
+name: Yandex Direct Report
+
+"on":
+  schedule:
+    # Daily report at 9:00 Moscow time (06:00 UTC)
+    - cron: "0 6 * * *"
+    # Weekly summary on Mondays at 9:05 Moscow time
+    - cron: "5 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      test:
+        description: "Send a test notification to Telegram"
+        type: boolean
+        default: false
+      report_type:
+        description: "Report type"
+        type: choice
+        options:
+          - daily
+          - weekly
+        default: daily
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Send daily report
+        if: github.event_name == 'schedule' && contains(github.event.schedule, '0 6 * * *')
+        env:
+          YANDEX_DIRECT_TOKEN: ${{ secrets.YANDEX_DIRECT_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          REPORT_TYPE: daily
+        run: python3 check_campaigns.py
+
+      - name: Send weekly report
+        if: github.event_name == 'schedule' && contains(github.event.schedule, '5 6 * * 1')
+        env:
+          YANDEX_DIRECT_TOKEN: ${{ secrets.YANDEX_DIRECT_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          REPORT_TYPE: weekly
+        run: python3 check_campaigns.py
+
+      - name: Manual report
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          YANDEX_DIRECT_TOKEN: ${{ secrets.YANDEX_DIRECT_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          REPORT_TYPE: ${{ inputs.report_type }}
+          TEST_MODE: ${{ inputs.test }}
+        run: python3 check_campaigns.py
