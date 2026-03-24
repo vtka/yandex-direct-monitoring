@@ -87,11 +87,17 @@ def fmt_number(val):
 
 
 def fmt_cost(val):
-    """Format cost value with ₽ sign."""
+    """Format cost value with ₸ sign (KZT tenge)."""
     try:
-        return f"{float(val):,.2f} ₽".replace(",", " ")
+        return f"{float(val):,.2f} ₸".replace(",", " ")
     except (ValueError, TypeError):
         return val
+
+
+def escape_links(name):
+    """Break auto-linking of domains in Telegram (e.g. author.today → author\u200b.today)."""
+    import re
+    return re.sub(r'\.(?=today|com|ru|net|org|io)', '.\u200b', name)
 
 
 def fmt_ctr(val):
@@ -132,7 +138,7 @@ def build_daily_message(rows, period="Вчера"):
         impressions = int(r.get("Impressions", 0))
         if impressions == 0 and clicks == 0:
             continue
-        name = r.get("CampaignName", "—")
+        name = escape_links(r.get("CampaignName", "—"))
         lines.append(
             f"\n▸ <b>{name}</b>\n"
             f"  {fmt_number(impressions)} показов · "
@@ -180,6 +186,7 @@ def build_weekly_message(rows):
     for name, data in sorted(campaigns.items(), key=lambda x: x[1]["cost"], reverse=True):
         if data["impressions"] == 0 and data["clicks"] == 0:
             continue
+        name = escape_links(name)
         lines.append(
             f"\n▸ <b>{name}</b>\n"
             f"  {fmt_number(data['impressions'])} показов · "
@@ -202,7 +209,7 @@ def main():
             "📊 <b>Пример сводки:</b>\n"
             "Показы: <b>1 234</b>\n"
             "Клики: <b>56</b>\n"
-            "Расход: <b>789.00 ₽</b>\n"
+            "Расход: <b>789.00 ₸</b>\n"
             "CTR: <b>4.54%</b>"
         )
         print("Test notification sent.")
