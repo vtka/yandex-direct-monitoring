@@ -3,18 +3,52 @@
 
 import json
 import os
+import re
 import ssl
 import time
 import urllib.request
 
-API_URL = "https://api.direct.yandex.com/json/v5/reports"
+API_BASE = "https://api.direct.yandex.com/json/v5"
 YANDEX_TOKEN = os.environ["YANDEX_DIRECT_TOKEN"]
 TELEGRAM_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 
+CURRENCY_SYMBOLS = {
+    "RUB": "₽", "KZT": "₸", "BYN": "Br", "USD": "$",
+    "EUR": "€", "CHF": "Fr", "TRY": "₺", "UAH": "₴",
+}
+
+
+def yandex_api(service, method, params):
+    """Call Yandex Direct JSON API v5."""
+    url = f"{API_BASE}/{service}"
+    body = json.dumps({"method": method, "params": params}).encode()
+    headers = {
+        "Authorization": f"Bearer {YANDEX_TOKEN}",
+        "Content-Type": "application/json; charset=utf-8",
+        "Accept-Language": "ru",
+    }
+    ctx = ssl.create_default_context()
+    req = urllib.request.Request(url, data=body, headers=headers)
+    resp = urllib.request.urlopen(req, timeout=30, context=ctx)
+    return json.loads(resp.read().decode())["result"]
+
+
+def get_currency_symbol():
+    """Get account currency symbol from Yandex Direct API."""
+    try:
+        result = yandex_api("clients", "get", {
+            "FieldNames": ["Currency"]
+        })
+        currency = result["Clients"][0]["Currency"]
+        return CURRENCY_SYMBOLS.get(currency, currency)
+    except Exception:
+        return "₸"
+
 
 def yandex_report(date_range, fields, report_type="CAMPAIGN_PERFORMANCE_REPORT"):
     """Fetch a report from Yandex Direct Reports API."""
+    url = f"{API_BASE}/reports"
     body = json.dumps({"params": {
         "SelectionCriteria": {},
         "FieldNames": fields,
@@ -37,7 +71,7 @@ def yandex_report(date_range, fields, report_type="CAMPAIGN_PERFORMANCE_REPORT")
 
     ctx = ssl.create_default_context()
     for attempt in range(10):
-        req = urllib.request.Request(API_URL, data=body, headers=headers)
+        req = urllib.request.Request(url, data=body, headers=headers)
         resp = urllib.request.urlopen(req, timeout=120, context=ctx)
         if resp.status in (200, 201):
             return resp.read().decode("utf-8")
@@ -86,29 +120,20 @@ def fmt_number(val):
         return val
 
 
-def fmt_cost(val):
-    """Format cost value with ₸ sign (KZT tenge)."""
+def fmt_cost(val, symbol="₸"):
+    """Format cost value with currency symbol."""
     try:
-        return f"{float(val):,.2f} ₸".replace(",", " ")
+        return f"{float(val):,.2f} {symbol}".replace(",", " ")
     except (ValueError, TypeError):
         return val
 
 
-def escape_links(name):
-    """Break auto-linking of domains in Telegram (e.g. author.today → author\u200b.today)."""
-    import re
-    return re.sub(r'\.(?=today|com|ru|net|org|io)', '.\u200b', name)
+def clean_campaign_name(name):
+    """Remove domain suffixes from campaign names to prevent Telegram auto-linking."""
+    return re.sub(r'\s*—\s*([\w-]+\.[\w]+)$', '', name)
 
 
-def fmt_ctr(val):
-    """Format CTR as percentage."""
-    try:
-        return f"{float(val):.2f}%"
-    except (ValueError, TypeError):
-        return val
-
-
-def build_daily_message(rows, period="Вчера"):
+def build_daily_message(rows, symbol, period="Вчера"):
     """Build Telegram message for daily campaign report."""
     if not rows:
         return f"📊 <b>Яндекс Директ — {period}</b>\n\nНет данных за этот период."
@@ -124,9 +149,9 @@ def build_daily_message(rows, period="Вчера"):
         "",
         f"Показы: <b>{fmt_number(total_impressions)}</b>",
         f"Клики: <b>{fmt_number(total_clicks)}</b>",
-        f"Расход: <b>{fmt_cost(total_cost)}</b>",
+        f"Расход: <b>{fmt_cost(total_cost, symbol)}</b>",
         f"CTR: <b>{total_ctr:.2f}%</b>",
-        f"Ср. цена клика: <b>{fmt_cost(avg_cpc)}</b>",
+        f"Ср. цена клика: <b>{fmt_cost(avg_cpc, symbol)}</b>",
     ]
 
     if len(rows) > 1:
@@ -138,18 +163,18 @@ def build_daily_message(rows, period="Вчера"):
         impressions = int(r.get("Impressions", 0))
         if impressions == 0 and clicks == 0:
             continue
-        name = escape_links(r.get("CampaignName", "—"))
+        name = clean_campaign_name(r.get("CampaignName", "—"))
         lines.append(
             f"\n▸ <b>{name}</b>\n"
             f"  {fmt_number(impressions)} показов · "
             f"{fmt_number(clicks)} кликов · "
-            f"{fmt_cost(cost)}"
+            f"{fmt_cost(cost, symbol)}"
         )
 
     return "\n".join(lines)
 
 
-def build_weekly_message(rows):
+def build_weekly_message(rows, symbol):
     """Build Telegram message for weekly summary."""
     if not rows:
         return "📈 <b>Яндекс Директ — Неделя</b>\n\nНет данных за неделю."
@@ -165,12 +190,11 @@ def build_weekly_message(rows):
         "",
         f"Показы: <b>{fmt_number(total_impressions)}</b>",
         f"Клики: <b>{fmt_number(total_clicks)}</b>",
-        f"Расход: <b>{fmt_cost(total_cost)}</b>",
+        f"Расход: <b>{fmt_cost(total_cost, symbol)}</b>",
         f"CTR: <b>{total_ctr:.2f}%</b>",
-        f"Ср. цена клика: <b>{fmt_cost(avg_cpc)}</b>",
+        f"Ср. цена клика: <b>{fmt_cost(avg_cpc, symbol)}</b>",
     ]
 
-    # Aggregate by campaign
     campaigns = {}
     for r in rows:
         name = r.get("CampaignName", "—")
@@ -186,12 +210,12 @@ def build_weekly_message(rows):
     for name, data in sorted(campaigns.items(), key=lambda x: x[1]["cost"], reverse=True):
         if data["impressions"] == 0 and data["clicks"] == 0:
             continue
-        name = escape_links(name)
+        name = clean_campaign_name(name)
         lines.append(
             f"\n▸ <b>{name}</b>\n"
             f"  {fmt_number(data['impressions'])} показов · "
             f"{fmt_number(data['clicks'])} кликов · "
-            f"{fmt_cost(data['cost'])}"
+            f"{fmt_cost(data['cost'], symbol)}"
         )
 
     return "\n".join(lines)
@@ -201,40 +225,43 @@ def main():
     report_type = os.environ.get("REPORT_TYPE", "daily")
 
     if os.environ.get("TEST_MODE") == "true":
+        symbol = get_currency_symbol()
         send_telegram(
             "🧪 <b>Тестовое уведомление</b>\n"
             "\n"
             "Мониторинг Яндекс Директ настроен.\n"
+            f"Валюта аккаунта: <b>{symbol}</b>\n"
             "\n"
             "📊 <b>Пример сводки:</b>\n"
             "Показы: <b>1 234</b>\n"
             "Клики: <b>56</b>\n"
-            "Расход: <b>789.00 ₸</b>\n"
+            f"Расход: <b>789.00 {symbol}</b>\n"
             "CTR: <b>4.54%</b>"
         )
         print("Test notification sent.")
         return
 
+    symbol = get_currency_symbol()
     fields = ["CampaignName", "Impressions", "Clicks", "Cost", "Ctr", "AvgCpc"]
 
     if report_type == "weekly":
         date_range = "LAST_7_DAYS"
         tsv = yandex_report(date_range, fields)
         rows = parse_tsv(tsv, fields)
-        msg = build_weekly_message(rows)
+        msg = build_weekly_message(rows, symbol)
     elif report_type == "today":
         date_range = "TODAY"
         tsv = yandex_report(date_range, fields)
         rows = parse_tsv(tsv, fields)
-        msg = build_daily_message(rows, period="Сегодня")
+        msg = build_daily_message(rows, symbol, period="Сегодня")
     else:
         date_range = "YESTERDAY"
         tsv = yandex_report(date_range, fields)
         rows = parse_tsv(tsv, fields)
-        msg = build_daily_message(rows)
+        msg = build_daily_message(rows, symbol)
 
     send_telegram(msg)
-    print(f"Report sent ({report_type}, {len(rows)} campaign rows)")
+    print(f"Report sent ({report_type}, {len(rows)} campaign rows, currency: {symbol})")
 
 
 if __name__ == "__main__":
